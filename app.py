@@ -122,26 +122,6 @@ stats["realized_LB_pct_without_oev"] = (stats["total_actual_bonus_usd"] / stats[
 stats["realized_LB_pct_with_oev"] = ((stats["total_actual_bonus_usd"] - stats["total_oev_usd"]) / stats["total_collateral_liquidated_usd"]) * 100
 stats["oev_recapture_pct"] = (stats["total_oev_usd"] / stats["recapturable_bonus_usd"]) * 100
 
-col_cl, col_rs = st.columns(2)
-provider_cols = {"Chainlink": col_cl, "RedStone": col_rs}
-
-for _, row in stats.iterrows():
-    col = provider_cols[row["oev_provider"]]
-    with col:
-        st.subheader(row["oev_provider"])
-        st.metric("OEV Recapture Efficiency", f"{row['oev_recapture_pct']:.2f}%")
-        st.metric("Liquidation Count", int(row["oev_liquidation_count"]))
-        st.metric("Total Collateral Liquidated", f"${row['total_collateral_liquidated_usd']:,.2f}")
-        st.metric("Total Debt Repaid", f"${row['total_debt_repaid_usd']:,.2f}")
-        st.metric("Total Liquidation Bonus", f"${row['total_actual_bonus_usd']:,.2f}")
-        st.metric("  └ Treasury Fee (5%, constant)", f"${row['treasury_fee_usd']:,.2f}")
-        st.metric("  └ Recapturable Bonus (solver share)", f"${row['recapturable_bonus_usd']:,.2f}")
-        st.metric("Total OEV Recaptured", f"${row['total_oev_usd']:,.2f}")
-        st.metric("Realized LB % without OEV Solution", f"{row['realized_LB_pct_without_oev']:.3f}%")
-        st.metric("Realized LB % with OEV Solution", f"{row['realized_LB_pct_with_oev']:.3f}%")
-
-st.divider()
-
 fig2, ax2 = plt.subplots(figsize=(6, 4))
 bar_colors2 = [colors[p] for p in stats["oev_provider"]]
 
@@ -170,6 +150,26 @@ fig2.tight_layout()
 _, col_c2, _ = st.columns([1, 2, 1])
 with col_c2:
     st.pyplot(fig2)
+
+st.divider()
+
+col_cl, col_rs = st.columns(2)
+provider_cols = {"Chainlink": col_cl, "RedStone": col_rs}
+
+for _, row in stats.iterrows():
+    col = provider_cols[row["oev_provider"]]
+    with col:
+        st.subheader(row["oev_provider"])
+        st.metric("OEV Recapture Efficiency", f"{row['oev_recapture_pct']:.2f}%")
+        st.metric("Liquidation Count", int(row["oev_liquidation_count"]))
+        st.metric("Total Collateral Liquidated", f"${row['total_collateral_liquidated_usd']:,.2f}")
+        st.metric("Total Debt Repaid", f"${row['total_debt_repaid_usd']:,.2f}")
+        st.metric("Total Liquidation Bonus", f"${row['total_actual_bonus_usd']:,.2f}")
+        st.metric("  └ Treasury Fee (5%, constant)", f"${row['treasury_fee_usd']:,.2f}")
+        st.metric("  └ Recapturable Bonus (solver share)", f"${row['recapturable_bonus_usd']:,.2f}")
+        st.metric("Total OEV Recaptured", f"${row['total_oev_usd']:,.2f}")
+        st.metric("Realized LB % without OEV Solution", f"{row['realized_LB_pct_without_oev']:.3f}%")
+        st.metric("Realized LB % with OEV Solution", f"{row['realized_LB_pct_with_oev']:.3f}%")
 
 # =============================================================
 # Chart 3: RedStone Collateral Seized by Token

@@ -101,33 +101,7 @@ col2.metric("Total Collateral Seized by RedStone", f"${total_rs_coll:,.2f}")
 st.dataframe(redstone_liqs, use_container_width=True)
 
 # =============================================================
-# Chart 2: RedStone Collateral Seized by Token
-# =============================================================
-st.header("RedStone: Total Collateral Seized by Token")
-
-df_rs = l_2023[l_2023["oev_provider"] == "RedStone"].copy()
-rs_by_coll = df_rs.groupby("coll_tokens")["total_coll_seized_usd"].sum().reset_index()
-rs_by_coll = rs_by_coll[rs_by_coll["total_coll_seized_usd"] >= 5].sort_values("total_coll_seized_usd", ascending=False)
-
-fig2, ax2 = plt.subplots(figsize=(8, 4))
-
-ax2.bar(rs_by_coll["coll_tokens"], rs_by_coll["total_coll_seized_usd"], color="red", alpha=0.8)
-
-ax2.set_xlabel("Collateral Token", fontsize=12)
-ax2.set_ylabel("Total Collateral Seized (USD)", fontsize=12)
-ax2.set_title("RedStone: Total Collateral Seized by Token", fontsize=14, fontweight="bold")
-ax2.grid(True, alpha=0.3, axis="y")
-ax2.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"${y:,.0f}"))
-plt.sca(ax2)
-plt.xticks(rotation=45, ha="right")
-fig2.tight_layout()
-
-_, col_c2, _ = st.columns([1, 2, 1])
-with col_c2:
-    st.pyplot(fig2)
-
-# =============================================================
-# Chart 3: OEV Recapture Efficiency (Venus 5% treasury adjusted)
+# Chart 2: OEV Recapture Efficiency (Venus 5% treasury adjusted)
 # =============================================================
 st.header("OEV Recapture Efficiency")
 st.caption("Venus protocol retains a constant 5% treasury fee on every liquidation. Recapture efficiency measures OEV recaptured vs the solver's share only.")
@@ -168,14 +142,14 @@ for _, row in stats.iterrows():
 
 st.divider()
 
-fig3, ax3 = plt.subplots(figsize=(6, 4))
-bar_colors3 = [colors[p] for p in stats["oev_provider"]]
+fig2, ax2 = plt.subplots(figsize=(6, 4))
+bar_colors2 = [colors[p] for p in stats["oev_provider"]]
 
-bars3 = ax3.bar(stats["oev_provider"], stats["oev_recapture_pct"], color=bar_colors3, alpha=0.8, width=0.5)
+bars2 = ax2.bar(stats["oev_provider"], stats["oev_recapture_pct"], color=bar_colors2, alpha=0.8, width=0.5)
 
-for bar in bars3:
+for bar in bars2:
     height = bar.get_height()
-    ax3.text(
+    ax2.text(
         bar.get_x() + bar.get_width() / 2.0,
         height,
         f"{height:.2f}%",
@@ -185,12 +159,38 @@ for bar in bars3:
         fontweight="bold",
     )
 
-ax3.set_ylim(0, 100)
-ax3.set_xlabel("OEV Provider", fontsize=12)
-ax3.set_ylabel("OEV Recapture Efficiency (%)", fontsize=12)
-ax3.set_title("OEV Recapture Efficiency by Provider", fontsize=14, fontweight="bold")
+ax2.set_ylim(0, 100)
+ax2.set_xlabel("OEV Provider", fontsize=12)
+ax2.set_ylabel("OEV Recapture Efficiency (%)", fontsize=12)
+ax2.set_title("OEV Recapture Efficiency by Provider", fontsize=14, fontweight="bold")
+ax2.grid(True, alpha=0.3, axis="y")
+ax2.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:.0f}%"))
+fig2.tight_layout()
+
+_, col_c2, _ = st.columns([1, 2, 1])
+with col_c2:
+    st.pyplot(fig2)
+
+# =============================================================
+# Chart 3: RedStone Collateral Seized by Token
+# =============================================================
+st.header("RedStone: Total Collateral Seized by Token")
+
+df_rs = l_2023[l_2023["oev_provider"] == "RedStone"].copy()
+rs_by_coll = df_rs.groupby("coll_tokens")["total_coll_seized_usd"].sum().reset_index()
+rs_by_coll = rs_by_coll[rs_by_coll["total_coll_seized_usd"] >= 5].sort_values("total_coll_seized_usd", ascending=False)
+
+fig3, ax3 = plt.subplots(figsize=(8, 4))
+
+ax3.bar(rs_by_coll["coll_tokens"], rs_by_coll["total_coll_seized_usd"], color="red", alpha=0.8)
+
+ax3.set_xlabel("Collateral Token", fontsize=12)
+ax3.set_ylabel("Total Collateral Seized (USD)", fontsize=12)
+ax3.set_title("RedStone: Total Collateral Seized by Token", fontsize=14, fontweight="bold")
 ax3.grid(True, alpha=0.3, axis="y")
-ax3.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:.0f}%"))
+ax3.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"${y:,.0f}"))
+plt.sca(ax3)
+plt.xticks(rotation=45, ha="right")
 fig3.tight_layout()
 
 _, col_c3, _ = st.columns([1, 2, 1])

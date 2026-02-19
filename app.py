@@ -228,24 +228,8 @@ _, col_c2, _ = st.columns([1, 2, 1])
 with col_c2:
     st_echarts(options=options2, height="400px")
 
-st.divider()
-
 cl_row = stats[stats["oev_provider"] == "Chainlink"].iloc[0]
 rs_row = stats[stats["oev_provider"] == "RedStone"].iloc[0]
-
-col_cl, col_rs = st.columns(2)
-with col_cl:
-    st.metric(
-        "Chainlink — OEV Recapture Efficiency",
-        f"{cl_row['oev_recapture_pct']:.2f}%",
-        help="Share of the recapturable liquidation bonus (liquidation bonus minus the 5% Venus treasury take rate) that was bid back via OEV.",
-    )
-with col_rs:
-    st.metric(
-        "RedStone — OEV Recapture Efficiency",
-        f"{rs_row['oev_recapture_pct']:.2f}%",
-        help="Share of the recapturable liquidation bonus (liquidation bonus minus the 5% Venus treasury take rate) that was bid back via OEV.",
-    )
 
 st.divider()
 

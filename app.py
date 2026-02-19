@@ -96,7 +96,7 @@ options1 = {
             {"value": round(v, 3), "itemStyle": {"color": "#0847F7" if k == "Chainlink" else "#AE0822"}}
             for k, v in chart1_data.items()
         ],
-        "label": {"show": True, "position": "top", "formatter": "{c}%"},
+        "label": {"show": False},
         "barWidth": "40%",
     }],
 }
@@ -215,7 +215,7 @@ options2 = {
             {"value": round(v, 2), "itemStyle": {"color": "#0847F7" if k == "Chainlink" else "#AE0822"}}
             for k, v in chart2_data.items()
         ],
-        "label": {"show": True, "position": "top", "formatter": "{c}%"},
+        "label": {"show": False},
         "barWidth": "40%",
     }],
 }

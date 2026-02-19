@@ -1,30 +1,33 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime, timezone
 from streamlit_echarts import st_echarts
 from dune_client.client import DuneClient
 
 st.set_page_config(page_title="OEV Liquidation Dashboard", layout="wide")
 
-col_title, col_logo = st.columns([6, 1])
-with col_title:
-    st.title("OEV Liquidation Dashboard")
-    st.markdown("**RedStone Atom · Venus Protocol · BNB Smart Chain**")
-with col_logo:
-    st.image("RedStone_logotype_highlight.svg", width=160)
-
-st.markdown("*Analysis covers liquidations from 7 February 2026 00:00 CET onwards.*")
-st.caption(
-    "Data sources: "
-    "[Dune query #6702800](https://dune.com/queries/6702800) — liquidation & OEV recapture data · "
-    "[Dune query #6715606](https://dune.com/queries/6715606) — OEV coverage classification"
-)
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                     Roboto, Helvetica, Arial, sans-serif !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 
 @st.cache_data(ttl=21600)  # refresh every 6 hours
 def load_data():
     dune = DuneClient(st.secrets["DUNE_API_KEY"])
     result = dune.get_latest_result(6702800)
-    return pd.DataFrame(result.result.rows)
+    try:
+        fetch_time = result.times.execution_ended_at
+        if fetch_time.tzinfo is None:
+            fetch_time = fetch_time.replace(tzinfo=timezone.utc)
+    except AttributeError:
+        fetch_time = datetime.now(timezone.utc)
+    return pd.DataFrame(result.result.rows), fetch_time
 
 
 @st.cache_data(ttl=86400)  # refresh every 24 hours
@@ -34,8 +37,28 @@ def load_coverage_data():
     return pd.DataFrame(result.result.rows)
 
 
-l_2023 = load_data()
+l_2023, data_fetch_time = load_data()
 oev_cov = load_coverage_data()
+
+col_title, col_logo = st.columns([6, 1])
+with col_title:
+    st.title("OEV Liquidation Dashboard")
+    st.markdown("**RedStone Atom · Venus Protocol · BNB Smart Chain**")
+with col_logo:
+    st.image("RedStone_logotype_highlight.svg", width=160)
+    st.markdown(
+        f'<p style="font-size:0.72rem;opacity:0.5;text-align:right;margin-top:4px;">'
+        f'Dune last ran:<br>{data_fetch_time.strftime("%Y-%m-%d %H:%M")} UTC<br>'
+        f'(app re-fetches every 6h)</p>',
+        unsafe_allow_html=True,
+    )
+
+st.markdown("*Analysis covers liquidations from 7 February 2026 00:00 CET onwards.*")
+st.caption(
+    "Data sources: "
+    "[Dune query 6702800](https://dune.com/queries/6702800) — liquidation & OEV recapture data · "
+    "[Dune query 6715606](https://dune.com/queries/6715606) — OEV coverage classification"
+)
 
 # --- Shared filtering ---
 df_filtered = l_2023[
@@ -47,7 +70,8 @@ df_filtered["date"] = pd.to_datetime(df_filtered["block_time"]).dt.date
 # =============================================================
 # Chart 1: Overall Dollar-Weighted Average OEV/Collateral Ratio
 # =============================================================
-st.header("Overall Dollar-Weighted Average OEV/Collateral Ratio")
+st.header("Dollar-Weighted Average OEV Recapture/Collateral Ratio")
+st.markdown('<p style="font-size:0.95rem;opacity:0.7;">For each liquidation, the OEV bid is divided by the collateral seized; these ratios are then averaged across all transactions, weighted by collateral size, so larger liquidations carry more influence on the result.</p>', unsafe_allow_html=True)
 
 overall_avg = (
     df_filtered.groupby("oev_provider")
@@ -62,7 +86,7 @@ overall_avg = (
 
 chart1_data = overall_avg.set_index("oev_provider")["weighted_avg_ratio_pct"].to_dict()
 options1 = {
-    "title": {"text": "Overall Dollar-Weighted Average OEV/Collateral Ratio by Provider", "left": "center"},
+    "title": {},
     "tooltip": {"trigger": "axis"},
     "xAxis": {"type": "category", "data": list(chart1_data.keys())},
     "yAxis": {"type": "value", "axisLabel": {"formatter": "{value}%"}},
@@ -85,6 +109,7 @@ with col_c1:
 # Chart 2: Daily OEV Fees Recaptured (time series)
 # =============================================================
 st.header("Daily OEV Fees Recaptured")
+st.markdown('<p style="font-size:0.95rem;opacity:0.7;">Total OEV bids paid by searchers per day — the portion of the liquidation bonus returned to the protocol through the OEV auction.</p>', unsafe_allow_html=True)
 
 df_daily = l_2023[l_2023["oev_provider"].isin(["Chainlink", "RedStone"])].copy()
 df_daily["date"] = pd.to_datetime(df_daily["block_time"]).dt.date
@@ -100,7 +125,7 @@ daily_oev = (
 color_daily = "#AE0822" if prov_daily == "RedStone" else "#0847F7"
 
 options_daily = {
-    "title": {"text": f"Daily OEV Fees Recaptured — {prov_daily}", "left": "center"},
+    "title": {},
     "tooltip": {"trigger": "axis"},
     "xAxis": {"type": "category", "data": [str(d) for d in daily_oev["date"].tolist()], "axisLabel": {"rotate": 45}},
     "yAxis": {"type": "value", "axisLabel": {"formatter": "${value}"}},
@@ -136,7 +161,7 @@ total_rs_coll = l_2023[
 ]["total_coll_seized_usd"].sum()
 
 col1, col2 = st.columns(2)
-col1.metric("Total RedStone Liquidations", len(redstone_liqs), help="Collateral Seized > $1")
+col1.metric("Total RedStone Liquidations", len(redstone_liqs), help="Collateral Seized above 1 USD")
 col2.metric("Total Collateral Seized by RedStone", f"${total_rs_coll:,.2f}")
 
 st.dataframe(
@@ -155,7 +180,16 @@ st.dataframe(
 # Chart 2: OEV Recapture Efficiency (Venus 5% treasury adjusted)
 # =============================================================
 st.header("OEV Recapture Efficiency")
-st.caption("Venus protocol retains a constant 5% treasury take rate on every liquidation. Recapture efficiency measures OEV recaptured vs the solver's share only.")
+st.markdown(
+    '<p style="font-size:0.95rem;opacity:0.7;">'
+    "Venus protocol retains a constant 5% treasury take rate on every liquidation, leaving the remainder as the recapturable bonus — "
+    "the maximum a solver could theoretically bid back via OEV. "
+    "Recapture efficiency is the share of that solver-available bonus actually returned to the protocol. "
+    "A theoretical 100% means the solver bid back the entire recapturable bonus and retained zero profit; "
+    "lower values mean the winning bid was above the solver gross break-even point, with the difference kept as margin."
+    "</p>",
+    unsafe_allow_html=True,
+)
 
 df_oev = l_2023[l_2023["oev_provider"].isin(["Chainlink", "RedStone"])].copy()
 
@@ -175,7 +209,7 @@ stats["oev_recapture_pct"] = (stats["total_oev_usd"] / stats["recapturable_bonus
 
 chart2_data = stats.set_index("oev_provider")["oev_recapture_pct"].to_dict()
 options2 = {
-    "title": {"text": "OEV Recapture Efficiency by Provider", "left": "center"},
+    "title": {},
     "tooltip": {"trigger": "axis"},
     "xAxis": {"type": "category", "data": list(chart2_data.keys())},
     "yAxis": {"type": "value", "min": 0, "max": 100, "axisLabel": {"formatter": "{value}%"}},
@@ -277,7 +311,7 @@ with st.expander("ℹ️ Metric definitions"):
 # OEV Coverage
 # =============================================================
 st.header("OEV Coverage")
-st.caption("Coverage measures what share of eligible liquidation opportunities were actually captured via OEV provider.")
+st.markdown('<p style="font-size:0.95rem;opacity:0.7;">Coverage measures what share of eligible liquidation opportunities were actually captured via OEV provider.</p>', unsafe_allow_html=True)
 
 classified = oev_cov[
     (oev_cov["likely_cause_provider"].isin(["RedStone", "Chainlink"]))
@@ -304,7 +338,7 @@ with col_freq:
     st.metric(
         "Coverage (by count)",
         f"{rs_capture_rate:.1f}%",
-        help="% of eligible liquidations (by count) where collateral > $0.50 and oracle = RedStone that were captured via OEV.",
+        help="Share of eligible liquidations (by count) where the collateral asset is priced via a RedStone OEV-enabled vToken and collateral exceeded 0.50 USD, that were captured via OEV.",
     )
 with col_dw:
     st.metric(
@@ -316,15 +350,41 @@ with col_dw:
 st.divider()
 
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Eligible Liquidations", rs_total)
-c2.metric("Total Eligible Collateral", f"${rs_total_usd:,.2f}")
-c3.metric("Captured", f"{len(rs_captured)} (${rs_captured_usd:,.2f})")
-c4.metric("Missed",   f"{len(rs_missed)} (${rs_missed_usd:,.2f})")
+c1.metric(
+    "Eligible Liquidations",
+    rs_total,
+    help=(
+        "Liquidations where the collateral/debt asset that caused the user's health rate to go below 1 is a RedStone's OEV-enabled vToken "
+        "and collateral seized exceeded 0.50 USD. "
+    ),
+)
+c2.metric(
+    "Total Eligible Collateral",
+    f"${rs_total_usd:,.2f}",
+    help="Sum of collateral seized (USD) across all eligible liquidations — both captured and missed.",
+)
+c3.metric(
+    "Captured",
+    f"{len(rs_captured)} (${rs_captured_usd:,.2f})",
+    help=(
+        "Liquidations where the collateral/debt asset that caused the user's health rate to go below 1 is a RedStone's OEV-enabled vToken "
+        "and the liquidation was processed via the OEV channel. The solver paid a bid that is recaptured to the protocol."
+    ),
+)
+c4.metric(
+    "Missed",
+    f"{len(rs_missed)} (${rs_missed_usd:,.2f})",
+    help=(
+        "Liquidations where the collateral/debt asset that caused the user's health rate to go below 1 is a RedStone's OEV-enabled vToken "
+        "but the liquidation bypassed the OEV channel entirely — "
+        "executed as a regular liquidation with no bid recaptured to the protocol."
+    ),
+)
 
 # =============================================================
 # Chart 3: Collateral Seized by Token (provider toggle)
 # =============================================================
-st.header("Total Collateral Seized by Token")
+st.header("Total Collateral Seized by vToken")
 
 prov3 = st.radio("Provider", ["RedStone", "Chainlink"], index=0, horizontal=True, key="coll_token_toggle")
 
@@ -334,7 +394,7 @@ rs_by_coll = rs_by_coll[rs_by_coll["total_coll_seized_usd"] >= 5].sort_values("t
 color3 = "#AE0822" if prov3 == "RedStone" else "#0847F7"
 
 options3 = {
-    "title": {"text": f"{prov3}: Total Collateral Seized by Token", "left": "center"},
+    "title": {},
     "tooltip": {"trigger": "axis"},
     "xAxis": {"type": "category", "data": rs_by_coll["coll_tokens"].tolist(), "axisLabel": {"rotate": 45}},
     "yAxis": {"type": "value", "axisLabel": {"formatter": "${value}"}},

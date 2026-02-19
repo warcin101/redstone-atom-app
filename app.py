@@ -231,6 +231,20 @@ with col_c2:
 cl_row = stats[stats["oev_provider"] == "Chainlink"].iloc[0]
 rs_row = stats[stats["oev_provider"] == "RedStone"].iloc[0]
 
+col_cl, col_rs = st.columns(2)
+with col_cl:
+    st.metric(
+        "Chainlink — OEV Recapture Efficiency",
+        f"{cl_row['oev_recapture_pct']:.2f}%",
+        help="Share of the recapturable liquidation bonus (liquidation bonus minus the 5% Venus treasury take rate) that was bid back via OEV.",
+    )
+with col_rs:
+    st.metric(
+        "RedStone — OEV Recapture Efficiency",
+        f"{rs_row['oev_recapture_pct']:.2f}%",
+        help="Share of the recapturable liquidation bonus (liquidation bonus minus the 5% Venus treasury take rate) that was bid back via OEV.",
+    )
+
 st.divider()
 
 def _usd(v): return f"${v:,.2f}"

@@ -3,9 +3,21 @@ import pandas as pd
 from streamlit_echarts import st_echarts
 from dune_client.client import DuneClient
 
-st.set_page_config(page_title="RedStone Atom: Venus OEV Analysis", layout="wide")
-st.title("RedStone Atom: Venus OEV Analysis")
+st.set_page_config(page_title="OEV Liquidation Dashboard", layout="wide")
+
+col_title, col_logo = st.columns([6, 1])
+with col_title:
+    st.title("OEV Liquidation Dashboard")
+    st.markdown("**RedStone Atom · Venus Protocol · BNB Smart Chain**")
+with col_logo:
+    st.image("RedStone_logotype_highlight.svg", width=160)
+
 st.markdown("*Analysis covers liquidations from 7 February 2026 00:00 CET onwards.*")
+st.caption(
+    "Data sources: "
+    "[Dune query #6702800](https://dune.com/queries/6702800) — liquidation & OEV recapture data · "
+    "[Dune query #6715606](https://dune.com/queries/6715606) — OEV coverage classification"
+)
 
 
 @st.cache_data(ttl=21600)  # refresh every 6 hours
@@ -107,7 +119,7 @@ with col_daily:
 # =============================================================
 # Table: RedStone Liquidations (collateral seized > $1)
 # =============================================================
-st.header("RedStone Liquidations (Collateral Seized > $1)")
+st.header("RedStone Liquidations")
 
 redstone_liqs = l_2023[
     (l_2023["oev_provider"] == "RedStone") &
@@ -124,7 +136,7 @@ total_rs_coll = l_2023[
 ]["total_coll_seized_usd"].sum()
 
 col1, col2 = st.columns(2)
-col1.metric("Total RedStone Liquidations (coll > $1)", len(redstone_liqs))
+col1.metric("Total RedStone Liquidations", len(redstone_liqs), help="Collateral Seized > $1")
 col2.metric("Total Collateral Seized by RedStone", f"${total_rs_coll:,.2f}")
 
 st.dataframe(
@@ -143,7 +155,7 @@ st.dataframe(
 # Chart 2: OEV Recapture Efficiency (Venus 5% treasury adjusted)
 # =============================================================
 st.header("OEV Recapture Efficiency")
-st.caption("Venus protocol retains a constant 5% treasury fee on every liquidation. Recapture efficiency measures OEV recaptured vs the solver's share only.")
+st.caption("Venus protocol retains a constant 5% treasury take rate on every liquidation. Recapture efficiency measures OEV recaptured vs the solver's share only.")
 
 df_oev = l_2023[l_2023["oev_provider"].isin(["Chainlink", "RedStone"])].copy()
 
@@ -192,13 +204,13 @@ with col_cl:
     st.metric(
         "Chainlink — OEV Recapture Efficiency",
         f"{cl_row['oev_recapture_pct']:.2f}%",
-        help="Share of the recapturable liquidation bonus (liquidation bonus minus the 5% Venus treasury fee) that was bid back via OEV.",
+        help="Share of the recapturable liquidation bonus (liquidation bonus minus the 5% Venus treasury take rate) that was bid back via OEV.",
     )
 with col_rs:
     st.metric(
         "RedStone — OEV Recapture Efficiency",
         f"{rs_row['oev_recapture_pct']:.2f}%",
-        help="Share of the recapturable liquidation bonus (liquidation bonus minus the 5% Venus treasury fee) that was bid back via OEV.",
+        help="Share of the recapturable liquidation bonus (liquidation bonus minus the 5% Venus treasury take rate) that was bid back via OEV.",
     )
 
 st.divider()
@@ -211,9 +223,9 @@ comparison = pd.DataFrame({
         "Liquidation Count",
         "Total Collateral Liquidated",
         "Total Debt Repaid",
-        "Total Liquidation Bonus",
-        "└ Treasury Fee (5%, constant)",
-        "└ Recapturable Bonus (solver share)",
+        "Simulated Gross Liq. Bonus",
+        "└ Treasury Take Rate (5%, constant)",
+        "└ Simulated Recapturable Bonus (solver share)",
         "Total OEV Recaptured",
         "Simulated LB % without OEV Solution",
         "Realized LB % with OEV Solution",
@@ -244,16 +256,18 @@ comparison = pd.DataFrame({
 
 st.dataframe(comparison, use_container_width=True)
 
+st.markdown("*Note: All calculations presented in the above table do not take into consideration network fees.*")
+
 with st.expander("ℹ️ Metric definitions"):
     st.markdown("""
 | Metric | Definition |
 |---|---|
-| **Liquidation Count** | Number of liquidation transactions attributed to this oracle provider |
+| **Liquidation Count** | Number of liquidation transactions recaptured by each oracle provider |
 | **Total Collateral Liquidated** | Sum of collateral seized across all liquidations (USD) |
 | **Total Debt Repaid** | Sum of debt repaid by liquidators (USD) |
-| **Total Liquidation Bonus** | Collateral seized − Debt repaid; the gross bonus received by liquidators |
-| **Treasury Fee (5%, constant)** | Venus protocol retains 5% of debt repaid as a fixed protocol fee |
-| **Recapturable Bonus (solver share)** | Liquidation Bonus − Treasury Fee; the portion a solver can bid back via OEV |
+| **Simulated Gross Liq. Bonus** | Collateral seized − Debt repaid; the gross bonus received by liquidators |
+| **Treasury Take Rate (5%, constant)** | Venus protocol retains 5% of debt repaid as a fixed protocol fee |
+| **Simulated Recapturable Bonus (solver share)** | Gross Bonus − Treasury Take Rate; the portion a solver can bid back via OEV |
 | **Total OEV Recaptured** | Sum of OEV bids paid back to the protocol (USD) |
 | **Simulated LB % without OEV Solution** | Gross bonus as % of collateral, as if no OEV bids were made |
 | **Realized LB % with OEV Solution** | Net bonus after deducting OEV bids, as % of collateral |
@@ -278,19 +292,34 @@ rs_missed = classified[
     (classified["likely_cause_provider"] == "RedStone")
     & (classified["oev_provider"] == "none")
 ]
-rs_total = len(rs_captured) + len(rs_missed)
+rs_captured_usd = rs_captured["total_coll_seized_usd"].sum()
+rs_missed_usd   = rs_missed["total_coll_seized_usd"].sum()
+rs_total_usd    = rs_captured_usd + rs_missed_usd
+rs_total        = len(rs_captured) + len(rs_missed)
 rs_capture_rate = len(rs_captured) / rs_total * 100 if rs_total > 0 else 0
+rs_dw_coverage  = rs_captured_usd / rs_total_usd * 100 if rs_total_usd > 0 else 0
 
-col_rs, _ = st.columns(2)
-with col_rs:
+col_freq, col_dw, _, _ = st.columns(4)
+with col_freq:
     st.metric(
-        "RedStone — OEV Coverage",
+        "Coverage (by count)",
         f"{rs_capture_rate:.1f}%",
-        help="% of eligible liquidations (collateral > $0.50, oracle price = RedStone) that were captured via OEV.",
+        help="% of eligible liquidations (by count) where collateral > $0.50 and oracle = RedStone that were captured via OEV.",
     )
-    st.metric("Eligible Liquidations", rs_total)
-    st.metric("Captured", f"{len(rs_captured)} (${rs_captured['total_coll_seized_usd'].sum():,.2f})")
-    st.metric("Missed", f"{len(rs_missed)} (${rs_missed['total_coll_seized_usd'].sum():,.2f})")
+with col_dw:
+    st.metric(
+        "Coverage (dollar-weighted)",
+        f"{rs_dw_coverage:.1f}%",
+        help="% of total eligible collateral USD (captured + missed) that was actually captured via OEV.",
+    )
+
+st.divider()
+
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Eligible Liquidations", rs_total)
+c2.metric("Total Eligible Collateral", f"${rs_total_usd:,.2f}")
+c3.metric("Captured", f"{len(rs_captured)} (${rs_captured_usd:,.2f})")
+c4.metric("Missed",   f"{len(rs_missed)} (${rs_missed_usd:,.2f})")
 
 # =============================================================
 # Chart 3: Collateral Seized by Token (provider toggle)

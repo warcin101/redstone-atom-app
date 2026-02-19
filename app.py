@@ -1,16 +1,18 @@
 import streamlit as st
 import pandas as pd
 from streamlit_echarts import st_echarts
+from dune_client.client import DuneClient
 
 st.set_page_config(page_title="RedStone Atom: Venus OEV Analysis", layout="wide")
 st.title("RedStone Atom: Venus OEV Analysis")
 st.markdown("*Analysis covers liquidations from 7 February 2026 00:00 CET onwards.*")
 
 
-@st.cache_data
+@st.cache_data(ttl=21600)  # refresh every 6 hours
 def load_data():
-    df = pd.read_csv("venus_streamlit.csv")
-    return df
+    dune = DuneClient(st.secrets["DUNE_API_KEY"])
+    result = dune.get_latest_result(6702800)
+    return pd.DataFrame(result.result.rows)
 
 
 l_2023 = load_data()

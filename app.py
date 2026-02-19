@@ -160,10 +160,6 @@ total_rs_coll = l_2023[
     (l_2023["oev_to_collateral_ratio"].notna())
 ]["total_coll_seized_usd"].sum()
 
-col1, col2 = st.columns(2)
-col1.metric("Total RedStone Liquidations", len(redstone_liqs), help="Collateral Seized above 1 USD")
-col2.metric("Total Collateral Seized by RedStone", f"${total_rs_coll:,.2f}")
-
 st.dataframe(
     redstone_liqs,
     column_config={
@@ -324,22 +320,6 @@ rs_total_usd    = rs_captured_usd + rs_missed_usd
 rs_total        = len(rs_captured) + len(rs_missed)
 rs_capture_rate = len(rs_captured) / rs_total * 100 if rs_total > 0 else 0
 rs_dw_coverage  = rs_captured_usd / rs_total_usd * 100 if rs_total_usd > 0 else 0
-
-col_freq, col_dw, _, _ = st.columns(4)
-with col_freq:
-    st.metric(
-        "Coverage (by count)",
-        f"{rs_capture_rate:.1f}%",
-        help="Share of eligible liquidations (by count) where the collateral asset is priced via a RedStone OEV-enabled vToken and collateral exceeded 0.50 USD, that were captured via OEV.",
-    )
-with col_dw:
-    st.metric(
-        "Coverage (dollar-weighted)",
-        f"{rs_dw_coverage:.1f}%",
-        help="% of total eligible collateral USD (captured + missed) that was actually captured via OEV.",
-    )
-
-st.divider()
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric(

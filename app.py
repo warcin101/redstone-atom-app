@@ -312,6 +312,14 @@ with st.expander("ℹ️ Metric definitions"):
 # =============================================================
 st.header("OEV Coverage")
 st.markdown('<p style="font-size:0.95rem;opacity:0.7;">Coverage measures what share of eligible liquidation opportunities were actually captured via OEV provider.</p>', unsafe_allow_html=True)
+st.markdown(
+    '<p style="font-size:0.85rem;opacity:0.55;margin-top:2px;margin-bottom:0;">Provider</p>'
+    '<p style="font-size:1.1rem;font-weight:500;margin-top:2px;">'
+    '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;'
+    'background:#AE0822;vertical-align:middle;margin-right:7px;"></span>'
+    'RedStone</p>',
+    unsafe_allow_html=True,
+)
 
 classified = oev_cov[
     (oev_cov["likely_cause_provider"].isin(["RedStone", "Chainlink"]))

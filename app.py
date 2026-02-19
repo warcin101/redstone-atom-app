@@ -160,6 +160,10 @@ total_rs_coll = l_2023[
     (l_2023["oev_to_collateral_ratio"].notna())
 ]["total_coll_seized_usd"].sum()
 
+col1, col2 = st.columns(2)
+col1.metric("Total RedStone Liquidations", len(redstone_liqs), help="Collateral Seized above 1 USD")
+col2.metric("Total Collateral Seized by RedStone", f"${total_rs_coll:,.2f}")
+
 st.dataframe(
     redstone_liqs,
     column_config={

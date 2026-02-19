@@ -47,7 +47,7 @@ options1 = {
     "series": [{
         "type": "bar",
         "data": [
-            {"value": round(v, 3), "itemStyle": {"color": "#0000ff" if k == "Chainlink" else "#ff0000"}}
+            {"value": round(v, 3), "itemStyle": {"color": "#0847F7" if k == "Chainlink" else "#AE0822"}}
             for k, v in chart1_data.items()
         ],
         "label": {"show": True, "position": "top", "formatter": "{c}%"},
@@ -111,7 +111,7 @@ options2 = {
     "series": [{
         "type": "bar",
         "data": [
-            {"value": round(v, 2), "itemStyle": {"color": "#0000ff" if k == "Chainlink" else "#ff0000"}}
+            {"value": round(v, 2), "itemStyle": {"color": "#0847F7" if k == "Chainlink" else "#AE0822"}}
             for k, v in chart2_data.items()
         ],
         "label": {"show": True, "position": "top", "formatter": "{c}%"},
@@ -160,7 +160,7 @@ options3 = {
     "series": [{
         "type": "bar",
         "data": [round(v, 2) for v in rs_by_coll["total_coll_seized_usd"].tolist()],
-        "itemStyle": {"color": "#ff0000"},
+        "itemStyle": {"color": "#AE0822"},
         "label": {"show": False},
     }],
 }

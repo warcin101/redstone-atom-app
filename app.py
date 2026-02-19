@@ -69,7 +69,11 @@ st.header("RedStone Liquidations (Collateral Seized > $1)")
 redstone_liqs = l_2023[
     (l_2023["oev_provider"] == "RedStone") &
     (l_2023["total_coll_seized_usd"] > 1)
-][["tx_hash", "coll_tokens", "debt_tokens", "total_coll_seized_usd", "total_debt_repaid_usd", "oev_bid_usd"]].sort_values("oev_bid_usd", ascending=False)
+][["block_time", "tx_hash", "coll_tokens", "debt_tokens", "total_coll_seized_usd", "total_debt_repaid_usd", "oev_bid_usd"]].sort_values("block_time", ascending=False).copy()
+
+redstone_liqs["tx_url"] = "https://bscscan.com/tx/" + redstone_liqs["tx_hash"]
+redstone_liqs["block_time"] = pd.to_datetime(redstone_liqs["block_time"]).dt.strftime("%Y-%m-%d %H:%M")
+redstone_liqs = redstone_liqs[["block_time", "tx_url", "coll_tokens", "debt_tokens", "total_coll_seized_usd", "total_debt_repaid_usd", "oev_bid_usd"]]
 
 total_rs_coll = l_2023[
     (l_2023["oev_provider"] == "RedStone") &
@@ -80,7 +84,17 @@ col1, col2 = st.columns(2)
 col1.metric("Total RedStone Liquidations (coll > $1)", len(redstone_liqs))
 col2.metric("Total Collateral Seized by RedStone", f"${total_rs_coll:,.2f}")
 
-st.dataframe(redstone_liqs, use_container_width=True)
+st.dataframe(
+    redstone_liqs,
+    column_config={
+        "block_time": st.column_config.TextColumn("Block Time (UTC)"),
+        "tx_url": st.column_config.LinkColumn(
+            "Transaction",
+            display_text="https://bscscan\\.com/tx/(.+)",
+        ),
+    },
+    use_container_width=True,
+)
 
 # =============================================================
 # Chart 2: OEV Recapture Efficiency (Venus 5% treasury adjusted)

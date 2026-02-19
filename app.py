@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
+from streamlit_echarts import st_echarts
 
 st.set_page_config(page_title="RedStone Atom: Venus OEV Analysis", layout="wide")
 st.title("RedStone Atom: Venus OEV Analysis")
@@ -23,8 +22,6 @@ df_filtered = l_2023[
 ].copy()
 df_filtered["date"] = pd.to_datetime(df_filtered["block_time"]).dt.date
 
-colors = {"Chainlink": "blue", "RedStone": "red"}
-
 # =============================================================
 # Chart 1: Overall Dollar-Weighted Average OEV/Collateral Ratio
 # =============================================================
@@ -41,43 +38,26 @@ overall_avg = (
     .reset_index(name="weighted_avg_ratio_pct")
 )
 
-fig1, ax1 = plt.subplots(figsize=(9, 6))
-bar_colors = [colors[p] for p in overall_avg["oev_provider"]]
-
-bars1 = ax1.bar(
-    overall_avg["oev_provider"],
-    overall_avg["weighted_avg_ratio_pct"],
-    color=bar_colors,
-    alpha=0.8,
-    width=0.5,
-)
-
-for bar in bars1:
-    height = bar.get_height()
-    ax1.text(
-        bar.get_x() + bar.get_width() / 2.0,
-        height,
-        f"{height:.3f}%",
-        ha="center",
-        va="bottom",
-        fontsize=12,
-        fontweight="bold",
-    )
-
-ax1.set_xlabel("OEV Provider", fontsize=12)
-ax1.set_ylabel("Dollar-Weighted Avg OEV to Collateral Ratio (%)", fontsize=12)
-ax1.set_title(
-    "Overall Dollar-Weighted Average OEV/Collateral Ratio by Provider",
-    fontsize=14,
-    fontweight="bold",
-)
-ax1.grid(True, alpha=0.3, axis="y")
-ax1.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:.2f}%"))
-fig1.tight_layout()
+chart1_data = overall_avg.set_index("oev_provider")["weighted_avg_ratio_pct"].to_dict()
+options1 = {
+    "title": {"text": "Overall Dollar-Weighted Average OEV/Collateral Ratio by Provider", "left": "center"},
+    "tooltip": {"trigger": "axis"},
+    "xAxis": {"type": "category", "data": list(chart1_data.keys())},
+    "yAxis": {"type": "value", "axisLabel": {"formatter": "{value}%"}},
+    "series": [{
+        "type": "bar",
+        "data": [
+            {"value": round(v, 3), "itemStyle": {"color": "#0000ff" if k == "Chainlink" else "#ff0000"}}
+            for k, v in chart1_data.items()
+        ],
+        "label": {"show": True, "position": "top", "formatter": "{c}%"},
+        "barWidth": "40%",
+    }],
+}
 
 _, col_c1, _ = st.columns([1, 2, 1])
 with col_c1:
-    st.pyplot(fig1)
+    st_echarts(options=options1, height="400px")
 
 # =============================================================
 # Table: RedStone Liquidations (collateral seized > $1)
@@ -122,34 +102,26 @@ stats["realized_LB_pct_without_oev"] = (stats["total_actual_bonus_usd"] / stats[
 stats["realized_LB_pct_with_oev"] = ((stats["total_actual_bonus_usd"] - stats["total_oev_usd"]) / stats["total_collateral_liquidated_usd"]) * 100
 stats["oev_recapture_pct"] = (stats["total_oev_usd"] / stats["recapturable_bonus_usd"]) * 100
 
-fig2, ax2 = plt.subplots(figsize=(6, 4))
-bar_colors2 = [colors[p] for p in stats["oev_provider"]]
-
-bars2 = ax2.bar(stats["oev_provider"], stats["oev_recapture_pct"], color=bar_colors2, alpha=0.8, width=0.5)
-
-for bar in bars2:
-    height = bar.get_height()
-    ax2.text(
-        bar.get_x() + bar.get_width() / 2.0,
-        height,
-        f"{height:.2f}%",
-        ha="center",
-        va="bottom",
-        fontsize=12,
-        fontweight="bold",
-    )
-
-ax2.set_ylim(0, 100)
-ax2.set_xlabel("OEV Provider", fontsize=12)
-ax2.set_ylabel("OEV Recapture Efficiency (%)", fontsize=12)
-ax2.set_title("OEV Recapture Efficiency by Provider", fontsize=14, fontweight="bold")
-ax2.grid(True, alpha=0.3, axis="y")
-ax2.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:.0f}%"))
-fig2.tight_layout()
+chart2_data = stats.set_index("oev_provider")["oev_recapture_pct"].to_dict()
+options2 = {
+    "title": {"text": "OEV Recapture Efficiency by Provider", "left": "center"},
+    "tooltip": {"trigger": "axis"},
+    "xAxis": {"type": "category", "data": list(chart2_data.keys())},
+    "yAxis": {"type": "value", "min": 0, "max": 100, "axisLabel": {"formatter": "{value}%"}},
+    "series": [{
+        "type": "bar",
+        "data": [
+            {"value": round(v, 2), "itemStyle": {"color": "#0000ff" if k == "Chainlink" else "#ff0000"}}
+            for k, v in chart2_data.items()
+        ],
+        "label": {"show": True, "position": "top", "formatter": "{c}%"},
+        "barWidth": "40%",
+    }],
+}
 
 _, col_c2, _ = st.columns([1, 2, 1])
 with col_c2:
-    st.pyplot(fig2)
+    st_echarts(options=options2, height="400px")
 
 st.divider()
 
@@ -168,7 +140,7 @@ for _, row in stats.iterrows():
         st.metric("  └ Treasury Fee (5%, constant)", f"${row['treasury_fee_usd']:,.2f}")
         st.metric("  └ Recapturable Bonus (solver share)", f"${row['recapturable_bonus_usd']:,.2f}")
         st.metric("Total OEV Recaptured", f"${row['total_oev_usd']:,.2f}")
-        st.metric("Realized LB % without OEV Solution", f"{row['realized_LB_pct_without_oev']:.3f}%")
+        st.metric("Simulated realized LB % without OEV Solution", f"{row['realized_LB_pct_without_oev']:.3f}%")
         st.metric("Realized LB % with OEV Solution", f"{row['realized_LB_pct_with_oev']:.3f}%")
 
 # =============================================================
@@ -180,19 +152,19 @@ df_rs = l_2023[l_2023["oev_provider"] == "RedStone"].copy()
 rs_by_coll = df_rs.groupby("coll_tokens")["total_coll_seized_usd"].sum().reset_index()
 rs_by_coll = rs_by_coll[rs_by_coll["total_coll_seized_usd"] >= 5].sort_values("total_coll_seized_usd", ascending=False)
 
-fig3, ax3 = plt.subplots(figsize=(8, 4))
-
-ax3.bar(rs_by_coll["coll_tokens"], rs_by_coll["total_coll_seized_usd"], color="red", alpha=0.8)
-
-ax3.set_xlabel("Collateral Token", fontsize=12)
-ax3.set_ylabel("Total Collateral Seized (USD)", fontsize=12)
-ax3.set_title("RedStone: Total Collateral Seized by Token", fontsize=14, fontweight="bold")
-ax3.grid(True, alpha=0.3, axis="y")
-ax3.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"${y:,.0f}"))
-plt.sca(ax3)
-plt.xticks(rotation=45, ha="right")
-fig3.tight_layout()
+options3 = {
+    "title": {"text": "RedStone: Total Collateral Seized by Token", "left": "center"},
+    "tooltip": {"trigger": "axis"},
+    "xAxis": {"type": "category", "data": rs_by_coll["coll_tokens"].tolist(), "axisLabel": {"rotate": 45}},
+    "yAxis": {"type": "value", "axisLabel": {"formatter": "${value}"}},
+    "series": [{
+        "type": "bar",
+        "data": [round(v, 2) for v in rs_by_coll["total_coll_seized_usd"].tolist()],
+        "itemStyle": {"color": "#ff0000"},
+        "label": {"show": False},
+    }],
+}
 
 _, col_c3, _ = st.columns([1, 2, 1])
 with col_c3:
-    st.pyplot(fig3)
+    st_echarts(options=options3, height="400px")

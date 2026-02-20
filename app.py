@@ -83,7 +83,7 @@ options1 = {
     "title": {},
     "tooltip": {"trigger": "axis"},
     "xAxis": {"type": "category", "data": ["RedStone"]},
-    "yAxis": {"type": "value", "axisLabel": {"formatter": "{value}%"}},
+    "yAxis": {"type": "value", "min": 0, "max": round(rs_weighted_avg + 1, 1), "axisLabel": {"formatter": "{value}%"}},
     "series": [{
         "type": "bar",
         "data": [{"value": round(rs_weighted_avg, 3), "itemStyle": {"color": "#AE0822"}}],

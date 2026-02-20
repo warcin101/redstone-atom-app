@@ -60,9 +60,9 @@ st.caption(
     "[Dune query 6715606](https://dune.com/queries/6715606) — OEV coverage classification"
 )
 
-# --- Shared filtering ---
+# --- Shared filtering (RedStone only) ---
 df_filtered = l_2023[
-    (l_2023["oev_provider"].isin(["Chainlink", "RedStone"]))
+    (l_2023["oev_provider"] == "RedStone")
     & (l_2023["oev_to_collateral_ratio"].notna())
 ].copy()
 df_filtered["date"] = pd.to_datetime(df_filtered["block_time"]).dt.date
@@ -73,29 +73,20 @@ df_filtered["date"] = pd.to_datetime(df_filtered["block_time"]).dt.date
 st.header("Dollar-Weighted Average OEV Recapture/Collateral Ratio")
 st.markdown('<p style="font-size:0.95rem;opacity:0.7;">For each liquidation, the OEV bid is divided by the collateral seized; these ratios are then averaged across all transactions, weighted by collateral size, so larger liquidations carry more influence on the result.</p>', unsafe_allow_html=True)
 
-overall_avg = (
-    df_filtered.groupby("oev_provider")
-    .apply(
-        lambda x: (x["oev_to_collateral_ratio"] * x["total_coll_seized_usd"]).sum()
-        / x["total_coll_seized_usd"].sum()
-        * 100,
-        include_groups=False,
-    )
-    .reset_index(name="weighted_avg_ratio_pct")
+rs_weighted_avg = (
+    (df_filtered["oev_to_collateral_ratio"] * df_filtered["total_coll_seized_usd"]).sum()
+    / df_filtered["total_coll_seized_usd"].sum()
+    * 100
 )
 
-chart1_data = overall_avg.set_index("oev_provider")["weighted_avg_ratio_pct"].to_dict()
 options1 = {
     "title": {},
     "tooltip": {"trigger": "axis"},
-    "xAxis": {"type": "category", "data": list(chart1_data.keys())},
+    "xAxis": {"type": "category", "data": ["RedStone"]},
     "yAxis": {"type": "value", "axisLabel": {"formatter": "{value}%"}},
     "series": [{
         "type": "bar",
-        "data": [
-            {"value": round(v, 3), "itemStyle": {"color": "#0847F7" if k == "Chainlink" else "#AE0822"}}
-            for k, v in chart1_data.items()
-        ],
+        "data": [{"value": round(rs_weighted_avg, 3), "itemStyle": {"color": "#AE0822"}}],
         "label": {"show": False},
         "barWidth": "40%",
     }],
@@ -105,24 +96,28 @@ _, col_c1, _ = st.columns([1, 2, 1])
 with col_c1:
     st_echarts(options=options1, height="400px")
 
+st.metric(
+    "RedStone — OEV Recapture/Collateral Ratio",
+    f"{rs_weighted_avg:.3f}%",
+    help="Dollar-weighted average of OEV bid divided by collateral seized across all RedStone liquidations.",
+)
+
 # =============================================================
 # Chart 2: Daily OEV Fees Recaptured (time series)
 # =============================================================
 st.header("Daily OEV Fees Recaptured")
 st.markdown('<p style="font-size:0.95rem;opacity:0.7;">Total OEV bids paid by searchers per day — the portion of the liquidation bonus returned to the protocol through the OEV auction.</p>', unsafe_allow_html=True)
 
-df_daily = l_2023[l_2023["oev_provider"].isin(["Chainlink", "RedStone"])].copy()
+df_daily = l_2023[l_2023["oev_provider"] == "RedStone"].copy()
 df_daily["date"] = pd.to_datetime(df_daily["block_time"]).dt.date
 
-prov_daily = st.radio("Provider", ["RedStone", "Chainlink"], index=0, horizontal=True, key="daily_oev_toggle")
-
 daily_oev = (
-    df_daily[df_daily["oev_provider"] == prov_daily]
+    df_daily
     .groupby("date")["oev_bid_usd"].sum()
     .reset_index()
     .sort_values("date")
 )
-color_daily = "#AE0822" if prov_daily == "RedStone" else "#0847F7"
+color_daily = "#AE0822"
 
 options_daily = {
     "title": {},
@@ -191,7 +186,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-df_oev = l_2023[l_2023["oev_provider"].isin(["Chainlink", "RedStone"])].copy()
+df_oev = l_2023[l_2023["oev_provider"] == "RedStone"].copy()
 
 stats = df_oev.groupby("oev_provider").agg(
     oev_liquidation_count=("tx_hash", "count"),
@@ -207,18 +202,16 @@ stats["realized_LB_pct_without_oev"] = (stats["total_actual_bonus_usd"] / stats[
 stats["realized_LB_pct_with_oev"] = ((stats["total_actual_bonus_usd"] - stats["total_oev_usd"]) / stats["total_collateral_liquidated_usd"]) * 100
 stats["oev_recapture_pct"] = (stats["total_oev_usd"] / stats["recapturable_bonus_usd"]) * 100
 
-chart2_data = stats.set_index("oev_provider")["oev_recapture_pct"].to_dict()
+rs_row = stats.iloc[0]
+
 options2 = {
     "title": {},
     "tooltip": {"trigger": "axis"},
-    "xAxis": {"type": "category", "data": list(chart2_data.keys())},
+    "xAxis": {"type": "category", "data": ["RedStone"]},
     "yAxis": {"type": "value", "min": 0, "max": 100, "axisLabel": {"formatter": "{value}%"}},
     "series": [{
         "type": "bar",
-        "data": [
-            {"value": round(v, 2), "itemStyle": {"color": "#0847F7" if k == "Chainlink" else "#AE0822"}}
-            for k, v in chart2_data.items()
-        ],
+        "data": [{"value": round(rs_row["oev_recapture_pct"], 2), "itemStyle": {"color": "#AE0822"}}],
         "label": {"show": False},
         "barWidth": "40%",
     }],
@@ -228,22 +221,11 @@ _, col_c2, _ = st.columns([1, 2, 1])
 with col_c2:
     st_echarts(options=options2, height="400px")
 
-cl_row = stats[stats["oev_provider"] == "Chainlink"].iloc[0]
-rs_row = stats[stats["oev_provider"] == "RedStone"].iloc[0]
-
-col_cl, col_rs = st.columns(2)
-with col_cl:
-    st.metric(
-        "Chainlink — OEV Recapture Efficiency",
-        f"{cl_row['oev_recapture_pct']:.2f}%",
-        help="Share of the recapturable liquidation bonus (liquidation bonus minus the 5% Venus treasury take rate) that was bid back via OEV.",
-    )
-with col_rs:
-    st.metric(
-        "RedStone — OEV Recapture Efficiency",
-        f"{rs_row['oev_recapture_pct']:.2f}%",
-        help="Share of the recapturable liquidation bonus (liquidation bonus minus the 5% Venus treasury take rate) that was bid back via OEV.",
-    )
+st.metric(
+    "RedStone — OEV Recapture Efficiency",
+    f"{rs_row['oev_recapture_pct']:.2f}%",
+    help="Share of the recapturable liquidation bonus (liquidation bonus minus the 5% Venus treasury take rate) that was bid back via OEV.",
+)
 
 st.divider()
 
@@ -261,17 +243,6 @@ comparison = pd.DataFrame({
         "Total OEV Recaptured",
         "Simulated LB % without OEV Solution",
         "Realized LB % with OEV Solution",
-    ],
-    "Chainlink": [
-        int(cl_row["oev_liquidation_count"]),
-        _usd(cl_row["total_collateral_liquidated_usd"]),
-        _usd(cl_row["total_debt_repaid_usd"]),
-        _usd(cl_row["total_actual_bonus_usd"]),
-        _usd(cl_row["treasury_fee_usd"]),
-        _usd(cl_row["recapturable_bonus_usd"]),
-        _usd(cl_row["total_oev_usd"]),
-        _pct(cl_row["realized_LB_pct_without_oev"]),
-        _pct(cl_row["realized_LB_pct_with_oev"]),
     ],
     "RedStone": [
         int(rs_row["oev_liquidation_count"]),
@@ -392,12 +363,10 @@ c4.metric(
 # =============================================================
 st.header("Total Collateral Seized by vToken")
 
-prov3 = st.radio("Provider", ["RedStone", "Chainlink"], index=0, horizontal=True, key="coll_token_toggle")
-
-df_prov3 = l_2023[l_2023["oev_provider"] == prov3].copy()
+df_prov3 = l_2023[l_2023["oev_provider"] == "RedStone"].copy()
 rs_by_coll = df_prov3.groupby("coll_tokens")["total_coll_seized_usd"].sum().reset_index()
 rs_by_coll = rs_by_coll[rs_by_coll["total_coll_seized_usd"] >= 5].sort_values("total_coll_seized_usd", ascending=False)
-color3 = "#AE0822" if prov3 == "RedStone" else "#0847F7"
+color3 = "#AE0822"
 
 options3 = {
     "title": {},

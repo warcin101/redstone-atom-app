@@ -280,7 +280,7 @@ with st.expander("ℹ️ Metric definitions"):
 # OEV Coverage
 # =============================================================
 st.header("OEV Coverage")
-st.markdown('<p style="font-size:0.95rem;opacity:0.7;">Coverage measures what share of eligible liquidation opportunities were actually captured via OEV provider.</p>', unsafe_allow_html=True)
+st.markdown('<p style="font-size:0.95rem;opacity:0.7;">Coverage measures what share of eligible liquidation opportunities were actually captured via OEV provider. This is an estimated statistic based on the probabilistic assumption of which vToken price change most likely triggered the liquidation.</p>', unsafe_allow_html=True)
 classified = oev_cov[
     (oev_cov["likely_cause_provider"].isin(["RedStone", "Chainlink"]))
     & (oev_cov["total_coll_seized_usd"] > 0.5)

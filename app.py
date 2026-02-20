@@ -30,7 +30,7 @@ def load_data():
     return pd.DataFrame(result.result.rows), fetch_time
 
 
-@st.cache_data(ttl=86400)  # refresh every 24 hours
+@st.cache_data(ttl=21600)  # refresh every 6 hours
 def load_coverage_data():
     dune = DuneClient(st.secrets["DUNE_API_KEY"])
     result = dune.get_latest_result(6715606)
